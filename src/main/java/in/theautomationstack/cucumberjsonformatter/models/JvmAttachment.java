@@ -1,4 +1,4 @@
-package com.cuckesalad.jsonformatter.models;
+package in.theautomationstack.cucumberjsonformatter.models;
 
 import java.util.Date;
 

@@ -1,4 +1,4 @@
-package com.cuckesalad.jsonformatter.exceptions;
+package in.theautomationstack.cucumberjsonformatter.exceptions;
 
 public class JsonCreationException extends RuntimeException {
 

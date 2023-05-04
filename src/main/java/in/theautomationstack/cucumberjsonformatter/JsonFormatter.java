@@ -1,20 +1,23 @@
-package com.cuckesalad.jsonformatter;
+package in.theautomationstack.cucumberjsonformatter;
 
-import com.cuckesalad.jsonformatter.exceptions.JsonCreationException;
-import com.cuckesalad.jsonformatter.models.JvmAttachment;
-import com.cuckesalad.jsonformatter.models.JvmBackground;
-import com.cuckesalad.jsonformatter.models.JvmFeature;
-import com.cuckesalad.jsonformatter.models.JvmHook;
-import com.cuckesalad.jsonformatter.models.JvmTestCase;
-import com.cuckesalad.jsonformatter.models.JvmTestStep;
-import com.cuckesalad.jsonformatter.models.TestExecution;
-import com.cuckesalad.jsonformatter.models.TestSourcesModel;
-import io.cucumber.core.internal.com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import in.theautomationstack.cucumberjsonformatter.exceptions.JsonCreationException;
+import in.theautomationstack.cucumberjsonformatter.models.JvmAttachment;
+import in.theautomationstack.cucumberjsonformatter.models.JvmBackground;
+import in.theautomationstack.cucumberjsonformatter.models.JvmFeature;
+import in.theautomationstack.cucumberjsonformatter.models.JvmHook;
+import in.theautomationstack.cucumberjsonformatter.models.JvmStatus;
+import in.theautomationstack.cucumberjsonformatter.models.JvmTestCase;
+import in.theautomationstack.cucumberjsonformatter.models.JvmTestStep;
+import in.theautomationstack.cucumberjsonformatter.models.TestExecution;
+import in.theautomationstack.cucumberjsonformatter.models.TestSourcesModel;
 import io.cucumber.messages.types.Background;
 import io.cucumber.messages.types.Feature;
 import io.cucumber.messages.types.FeatureChild;
 import io.cucumber.messages.types.Scenario;
 import io.cucumber.plugin.ConcurrentEventListener;
+import io.cucumber.plugin.Plugin;
 import io.cucumber.plugin.event.EmbedEvent;
 import io.cucumber.plugin.event.EventPublisher;
 import io.cucumber.plugin.event.HookTestStep;
@@ -30,6 +33,7 @@ import io.cucumber.plugin.event.TestStepStarted;
 import io.cucumber.plugin.event.WriteEvent;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Base64;
@@ -40,7 +44,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-public class JsonFormatter implements ConcurrentEventListener {
+public class JsonFormatter implements ConcurrentEventListener, Plugin {
 
   private TestExecution testExecution;
   private Map<UUID, UUID> lastPickleStepMap = new HashMap<>();
@@ -59,9 +63,6 @@ public class JsonFormatter implements ConcurrentEventListener {
     publisher.registerHandlerFor(TestCaseStarted.class, this::handleTestCaseStarted);
     publisher.registerHandlerFor(TestStepStarted.class, this::handleTestStepStarted);
     publisher.registerHandlerFor(TestStepFinished.class, this::handleTestStepFinished);
-    // publisher.registerHandlerFor(TestCaseFinished.class,
-    // this::handleTestCaseFinished); --
-    // unused in cucumber core
     publisher.registerHandlerFor(WriteEvent.class, this::handleWrite);
     publisher.registerHandlerFor(EmbedEvent.class, this::handleEmbed);
     publisher.registerHandlerFor(TestRunFinished.class, this::finishReport);
@@ -74,6 +75,7 @@ public class JsonFormatter implements ConcurrentEventListener {
   private void handleTestSourceRead(TestSourceRead event) {
     testSources.addTestSourceReadEvent(event.getUri(), event);
     Feature feature = testSources.getFeature(event.getUri());
+
     JvmFeature jvmFeature = new JvmFeature();
     jvmFeature.setName(feature.getName());
     jvmFeature.setDescription(feature.getDescription());
@@ -81,6 +83,7 @@ public class JsonFormatter implements ConcurrentEventListener {
     jvmFeature.setSource(event.getSource());
     jvmFeature.setUri(event.getUri());
     jvmFeature.setFileName(new File(event.getUri().toString()).getName());
+    jvmFeature.setStartTime(new Date(event.getInstant().toEpochMilli()));
     jvmFeature.setTags(
         feature.getTags().stream().map(tag -> tag.getName()).collect(Collectors.toList()));
     testExecution.setFeature(jvmFeature);
@@ -125,6 +128,10 @@ public class JsonFormatter implements ConcurrentEventListener {
       createJvmStepFromHook(event);
       lastHookStepMap.put(event.getTestCase().getId(), event.getTestStep().getId());
     }
+
+    testExecution
+        .getFeature(event.getTestCase().getUri())
+        .ifPresent(jvmftre -> jvmftre.setEndTime(new Date(event.getInstant().toEpochMilli())));
   }
 
   private void createBackgroundStep(TestStepStarted event) {
@@ -137,8 +144,6 @@ public class JsonFormatter implements ConcurrentEventListener {
     TestSourcesModel.AstNode astNode =
         testSources.getAstNode(event.getTestCase().getUri(), pickleTestStep.getStep().getLine());
     Background background = getBackgroundForTestCase(astNode).get();
-    TestStep testStep = event.getTestStep();
-    JvmTestStep jvmTestStep = null;
     JvmBackground jvmBackground = null;
 
     if (jvmTestCase.get().getBackground() == null) {
@@ -191,11 +196,7 @@ public class JsonFormatter implements ConcurrentEventListener {
         } else {
           jvmTestCase.getTestStep(null).get().setBeforeStep(jvmHookStep);
         }
-        try {
-          lastPickleStepMap.put(jvmTestCase.getId(), null);
-        } catch (Exception e) {
-          throw e;
-        }
+        lastPickleStepMap.put(jvmTestCase.getId(), null);
 
         break;
       case AFTER_STEP:
@@ -215,14 +216,18 @@ public class JsonFormatter implements ConcurrentEventListener {
   }
 
   private void createJvmStepFromPickle(TestStepStarted event) {
+    JvmStatus status = new JvmStatus();
+    status.setStatus("Passed");
+    status.setExceptionSummary("");
     Optional<JvmTestCase> jvmTestCase =
         testExecution
             .getFeature(event.getTestCase().getUri())
             .get()
             .getTestCase(event.getTestCase().getId());
     PickleStepTestStep pickleTestStep = (PickleStepTestStep) event.getTestStep();
-    TestSourcesModel.AstNode astNode =
-        testSources.getAstNode(event.getTestCase().getUri(), pickleTestStep.getStep().getLine());
+    // TestSourcesModel.AstNode astNode =
+    // testSources.getAstNode(event.getTestCase().getUri(),
+    // pickleTestStep.getStep().getLine());
 
     TestStep testStep = event.getTestStep();
     JvmTestStep jvmTestStep = null;
@@ -273,33 +278,56 @@ public class JsonFormatter implements ConcurrentEventListener {
     TestStep testStep = event.getTestStep();
     UUID testCaseUuid = event.getTestCase().getId();
     URI uri = event.getTestCase().getUri();
+    JvmStatus jvmStatus = new JvmStatus();
+    jvmStatus.setStatus(event.getResult().getStatus().name());
+
+    if (event.getResult().getStatus().name().equals("UNDEFINED")) {
+      jvmStatus.setStatus("FAILED");
+      jvmStatus.setExceptionSummary(
+          "Exception: "
+              + event.getResult().getError().getClass().getName()
+              + "\n Message: "
+              + event.getResult().getError().getMessage());
+    }
+    if (event.getResult().getError() != null) {
+      jvmStatus.setExceptionSummary(
+          "Exception: "
+              + event.getResult().getError().getClass().getName()
+              + "\n Message: "
+              + event.getResult().getError().getMessage());
+    }
 
     if (testStep instanceof PickleStepTestStep) {
       PickleStepTestStep pickleTestStep = (PickleStepTestStep) event.getTestStep();
-      TestSourcesModel.AstNode astNode =
-          testSources.getAstNode(event.getTestCase().getUri(), pickleTestStep.getStep().getLine());
+      // TestSourcesModel.AstNode astNode =
+      // testSources.getAstNode(event.getTestCase().getUri(),
+      // pickleTestStep.getStep().getLine());
       if (isBackgroundStep(pickleTestStep)) {
-        testExecution
-            .getFeature(uri)
-            .get()
-            .getTestCase(testCaseUuid)
-            .get()
-            .getBackground()
-            .getTestSteps()
-            .stream()
-            .filter(ts -> ts.getId().equals(testStep.getId()))
-            .findFirst()
-            .get()
-            .setEndTime(new Date(event.getInstant().toEpochMilli()));
+        JvmTestStep jvmTestStep =
+            testExecution
+                .getFeature(uri)
+                .get()
+                .getTestCase(testCaseUuid)
+                .get()
+                .getBackground()
+                .getTestSteps()
+                .stream()
+                .filter(ts -> ts.getId().equals(testStep.getId()))
+                .findFirst()
+                .get();
+        jvmTestStep.setEndTime(new Date(event.getInstant().toEpochMilli()));
+        jvmTestStep.setStatus(jvmStatus);
       } else {
-        testExecution
-            .getFeature(uri)
-            .get()
-            .getTestCase(testCaseUuid)
-            .get()
-            .getTestStep(testStep.getId())
-            .get()
-            .setEndTime(new Date(event.getInstant().toEpochMilli()));
+        JvmTestStep jvmTestStep =
+            testExecution
+                .getFeature(uri)
+                .get()
+                .getTestCase(testCaseUuid)
+                .get()
+                .getTestStep(testStep.getId())
+                .get();
+        jvmTestStep.setEndTime(new Date(event.getInstant().toEpochMilli()));
+        jvmTestStep.setStatus(jvmStatus);
       }
     }
     if (testStep instanceof HookTestStep) {
@@ -312,40 +340,52 @@ public class JsonFormatter implements ConcurrentEventListener {
               .get();
       switch (hookTestStep.getHookType()) {
         case BEFORE:
-          jvmTestCase.getBefore().stream()
-              .filter(ts -> ts.getId().equals(hookTestStep.getId()))
-              .findFirst()
-              .get()
-              .setEndTime(new Date(event.getInstant().toEpochMilli()));
+          JvmHook before =
+              jvmTestCase.getBefore().stream()
+                  .filter(ts -> ts.getId().equals(hookTestStep.getId()))
+                  .findFirst()
+                  .get();
+          before.setEndTime(new Date(event.getInstant().toEpochMilli()));
+          before.setStatus(jvmStatus);
+
           break;
         case AFTER:
-          jvmTestCase.getAfter().stream()
-              .filter(ts -> ts.getId().equals(hookTestStep.getId()))
-              .findFirst()
-              .get()
-              .setEndTime(new Date(event.getInstant().toEpochMilli()));
+          JvmHook after =
+              jvmTestCase.getAfter().stream()
+                  .filter(ts -> ts.getId().equals(hookTestStep.getId()))
+                  .findFirst()
+                  .get();
+          after.setEndTime(new Date(event.getInstant().toEpochMilli()));
+          after.setStatus(jvmStatus);
           break;
         case BEFORE_STEP:
-          jvmTestCase.getTestStep(null).get().getBeforeSteps().stream()
-              .filter(step -> step.getId().equals(hookTestStep.getId()))
-              .findFirst()
-              .get()
-              .setEndTime(new Date(event.getInstant().toEpochMilli()));
+          JvmHook beforeStep =
+              jvmTestCase.getTestStep(null).get().getBeforeSteps().stream()
+                  .filter(step -> step.getId().equals(hookTestStep.getId()))
+                  .findFirst()
+                  .get();
+          beforeStep.setEndTime(new Date(event.getInstant().toEpochMilli()));
+          beforeStep.setStatus(jvmStatus);
           break;
         case AFTER_STEP:
           UUID lastStepUUID = lastPickleStepMap.get(jvmTestCase.getId());
+          JvmHook afterStep;
           if (jvmTestCase.getTestStep(lastStepUUID).isPresent()) {
-            jvmTestCase.getTestStep(lastStepUUID).get().getAfterSteps().stream()
-                .filter(afterStep -> afterStep.getId().equals(hookTestStep.getId()))
-                .findFirst()
-                .get()
-                .setEndTime(new Date(event.getInstant().toEpochMilli()));
+            afterStep =
+                jvmTestCase.getTestStep(lastStepUUID).get().getAfterSteps().stream()
+                    .filter(aftStep -> aftStep.getId().equals(hookTestStep.getId()))
+                    .findFirst()
+                    .get();
+            afterStep.setEndTime(new Date(event.getInstant().toEpochMilli()));
+            afterStep.setStatus(jvmStatus);
           } else if (jvmTestCase.getBackground().getTestStep(lastStepUUID).isPresent()) {
-            jvmTestCase.getBackground().getTestStep(lastStepUUID).get().getAfterSteps().stream()
-                .filter(afterStep -> afterStep.getId().equals(hookTestStep.getId()))
-                .findFirst()
-                .get()
-                .setEndTime(new Date(event.getInstant().toEpochMilli()));
+            afterStep =
+                jvmTestCase.getBackground().getTestStep(lastStepUUID).get().getAfterSteps().stream()
+                    .filter(aftStep -> aftStep.getId().equals(hookTestStep.getId()))
+                    .findFirst()
+                    .get();
+            afterStep.setEndTime(new Date(event.getInstant().toEpochMilli()));
+            afterStep.setStatus(jvmStatus);
           }
           break;
         default:
@@ -353,12 +393,34 @@ public class JsonFormatter implements ConcurrentEventListener {
           break;
       }
     }
-    testExecution
-        .getFeature(uri)
-        .get()
-        .getTestCase(testCaseUuid)
-        .get()
-        .setEndtTime(new Date(event.getInstant().toEpochMilli()));
+    JvmTestCase jvmTestCase = testExecution.getFeature(uri).get().getTestCase(testCaseUuid).get();
+    jvmTestCase.setEndtTime(new Date(event.getInstant().toEpochMilli()));
+
+    jvmTestCase.getTestSteps().stream()
+        .filter(n -> n.getStatus() == null)
+        .forEach(m -> m.setStatus(jvmStatus));
+
+    jvmTestCase.getTestSteps().stream()
+        .filter(
+            n -> {
+              if (n.getStatus().getStatus().equals("FAILED")
+                  || n.getStatus().getStatus().equals("UNDEFINED")
+                  || n.getStatus().getStatus().equals("FAILED")
+                  || n.getStatus().getStatus().equals("SKIPPED")) {
+                return true;
+              }
+              return false;
+            })
+        .findFirst()
+        .ifPresent(
+            n -> {
+              JvmStatus status = new JvmStatus();
+              status.setStatus("FAILED");
+              jvmTestCase.setStatus(status);
+            });
+    if (jvmTestCase.getStatus() == null) {
+      jvmTestCase.setStatus(jvmStatus);
+    }
   }
 
   private void handleWrite(WriteEvent event) {
@@ -381,14 +443,13 @@ public class JsonFormatter implements ConcurrentEventListener {
             .getTestCase(event.getTestCase().getId())
             .get();
     JvmTestStep jvmTestStep = null;
-    ;
 
     if (jvmTestCase.getTestStep(lastStepUUID).isPresent()) {
       jvmTestStep = jvmTestCase.getTestStep(lastStepUUID).get();
-    } else if (jvmTestCase.getBackground().getTestStep(lastStepUUID).isPresent()) {
-      jvmTestStep = jvmTestCase.getBackground().getTestStep(lastStepUUID).get();
-    } else {
-      return;
+    }
+    if (jvmTestCase.getBackground() != null) {
+      if (jvmTestCase.getBackground().getTestStep(lastStepUUID).isPresent())
+        jvmTestStep = jvmTestCase.getBackground().getTestStep(lastStepUUID).get();
     }
 
     switch (lastStepMap.get(event.getTestCase().getId())) {
@@ -422,14 +483,19 @@ public class JsonFormatter implements ConcurrentEventListener {
   }
 
   private void finishReport(TestRunFinished event) {
+    testExecution.setEndTime(new Date(event.getInstant().toEpochMilli()));
     try {
-      ObjectMapper Obj = new ObjectMapper();
-      byte[] json = Obj.writeValueAsBytes(testExecution);
-
+      Gson gson = new GsonBuilder().setPrettyPrinting().serializeNulls().create();
       File file = new File(System.getProperty("user.dir") + "/target/vkd.json");
       FileOutputStream writer = new FileOutputStream(file);
-      writer.write(json);
+      writer.write(gson.toJson(testExecution).getBytes());
       writer.close();
+
+      Gson gson2 = new Gson();
+      TestExecution a =
+          gson2.fromJson(
+              new FileReader(new File(System.getProperty("user.dir") + "/target/vkd.json")),
+              TestExecution.class);
     } catch (IOException e) {
       throw new JsonCreationException(e.getMessage());
     }

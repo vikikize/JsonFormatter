@@ -1,23 +1,26 @@
-package com.cuckesalad.jsonformatter.models;
+package in.theautomationstack.cucumberjsonformatter.models;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-public class JvmRule {
+public class JvmFeature {
 
-  private String id;
   private String name;
   private String description;
-  private long line;
+  private String source;
   private URI uri;
+  private String fileName;
   private Set<JvmTestCase> testCases = new LinkedHashSet<>();
   private String keyword;
   private List<String> tags = new ArrayList<>();
+  private Date startTime;
+  private Date endTime;
 
   public String getName() {
     return name;
@@ -35,6 +38,14 @@ public class JvmRule {
     this.description = description;
   }
 
+  public String getSource() {
+    return source;
+  }
+
+  public void setSource(String source) {
+    this.source = source;
+  }
+
   public URI getUri() {
     return uri;
   }
@@ -43,16 +54,28 @@ public class JvmRule {
     this.uri = uri;
   }
 
+  public String getFileName() {
+    return fileName;
+  }
+
+  public void setFileName(String fileName) {
+    this.fileName = fileName;
+  }
+
   public Set<JvmTestCase> getTestCases() {
     return testCases;
   }
 
-  public Optional<JvmTestCase> getTestCase(UUID uuid) {
-    return testCases.stream().filter(testcase -> testcase.getId().equals(uuid)).findFirst();
-  }
-
   public void setTestCases(Set<JvmTestCase> testCases) {
     this.testCases = testCases;
+  }
+
+  public void setTestCase(JvmTestCase testCase) {
+    testCases.add(testCase);
+  }
+
+  public Optional<JvmTestCase> getTestCase(UUID uuid) {
+    return testCases.stream().filter(testcase -> testcase.getId().equals(uuid)).findFirst();
   }
 
   public String getKeyword() {
@@ -71,19 +94,19 @@ public class JvmRule {
     this.tags = tags;
   }
 
-  public String getId() {
-    return id;
+  public Date getStartTime() {
+    return startTime;
   }
 
-  public void setId(String id) {
-    this.id = id;
+  public void setStartTime(Date startTime) {
+    this.startTime = startTime;
   }
 
-  public long getLine() {
-    return line;
+  public Date getEndTime() {
+    return endTime;
   }
 
-  public void setLine(long line) {
-    this.line = line;
+  public void setEndTime(Date endTime) {
+    this.endTime = endTime;
   }
 }

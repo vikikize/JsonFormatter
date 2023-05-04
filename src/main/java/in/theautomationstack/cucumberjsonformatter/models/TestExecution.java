@@ -1,4 +1,4 @@
-package com.cuckesalad.jsonformatter.models;
+package in.theautomationstack.cucumberjsonformatter.models;
 
 import java.net.URI;
 import java.util.Date;
@@ -9,6 +9,7 @@ import java.util.Set;
 public class TestExecution {
 
   private Date startTime;
+  private Date endTime;
   private Set<JvmFeature> features = new LinkedHashSet<>();
 
   public Date getStartTime() {
@@ -33,5 +34,13 @@ public class TestExecution {
 
   public Optional<JvmFeature> getFeature(URI uri) {
     return this.features.stream().filter(feature -> feature.getUri().equals(uri)).findFirst();
+  }
+
+  public Date getEndTime() {
+    return endTime;
+  }
+
+  public void setEndTime(Date endTime) {
+    this.endTime = endTime;
   }
 }

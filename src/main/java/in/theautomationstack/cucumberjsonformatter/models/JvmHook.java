@@ -1,12 +1,13 @@
-package com.cuckesalad.jsonformatter.models;
+package in.theautomationstack.cucumberjsonformatter.models;
 
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 
-public class JvmTestStep {
+public class JvmHook {
 
+  private String type;
   private UUID id;
   private String codeLocation;
   private Date startTime;
@@ -14,9 +15,20 @@ public class JvmTestStep {
   private String keyword;
   private String name;
   private long line;
-  private final Set<JvmHook> beforeSteps = new LinkedHashSet<>();
-  private final Set<JvmHook> afterSteps = new LinkedHashSet<>();
   private Set<JvmAttachment> attachments = new LinkedHashSet<>();
+  private JvmStatus status;
+
+  public JvmHook(String type) {
+    this.type = type;
+  }
+
+  public String getType() {
+    return type;
+  }
+
+  public void setType(String type) {
+    this.type = type;
+  }
 
   public UUID getId() {
     return id;
@@ -50,18 +62,6 @@ public class JvmTestStep {
     this.endTime = endTime;
   }
 
-  public Set<JvmAttachment> getAttachments() {
-    return attachments;
-  }
-
-  public void setAttachments(Set<JvmAttachment> attachments) {
-    this.attachments = attachments;
-  }
-
-  public void setAttachment(JvmAttachment attachment) {
-    this.attachments.add(attachment);
-  }
-
   public String getKeyword() {
     return keyword;
   }
@@ -86,19 +86,23 @@ public class JvmTestStep {
     this.line = line;
   }
 
-  public Set<JvmHook> getBeforeSteps() {
-    return beforeSteps;
+  public Set<JvmAttachment> getAttachments() {
+    return attachments;
   }
 
-  public void setBeforeStep(JvmHook beforeStep) {
-    this.beforeSteps.add(beforeStep);
+  public void setAttachments(Set<JvmAttachment> attachments) {
+    this.attachments = attachments;
   }
 
-  public Set<JvmHook> getAfterSteps() {
-    return afterSteps;
+  public void setAttachment(JvmAttachment jvmAttachment) {
+    this.attachments.add(jvmAttachment);
   }
 
-  public void setAfterStep(JvmHook afterStep) {
-    this.afterSteps.add(afterStep);
+  public JvmStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(JvmStatus status) {
+    this.status = status;
   }
 }

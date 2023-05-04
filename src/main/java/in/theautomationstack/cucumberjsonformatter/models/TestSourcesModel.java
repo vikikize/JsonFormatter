@@ -1,4 +1,4 @@
-package com.cuckesalad.jsonformatter.models;
+package in.theautomationstack.cucumberjsonformatter.models;
 
 import io.cucumber.gherkin.GherkinParser;
 import io.cucumber.messages.types.Background;

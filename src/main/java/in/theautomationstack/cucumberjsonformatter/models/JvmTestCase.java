@@ -1,4 +1,4 @@
-package com.cuckesalad.jsonformatter.models;
+package in.theautomationstack.cucumberjsonformatter.models;
 
 import java.net.URI;
 import java.util.Date;
@@ -23,6 +23,7 @@ public class JvmTestCase {
   private Set<JvmTestStep> testSteps = new LinkedHashSet<>();
   private Date startTime;
   private Date endtTime;
+  private JvmStatus status;
 
   public long getLine() {
     return line;
@@ -152,5 +153,13 @@ public class JvmTestCase {
 
   public void setEndtTime(Date endtTime) {
     this.endtTime = endtTime;
+  }
+
+  public JvmStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(JvmStatus status) {
+    this.status = status;
   }
 }

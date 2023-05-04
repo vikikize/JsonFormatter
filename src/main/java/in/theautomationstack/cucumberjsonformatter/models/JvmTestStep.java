@@ -1,13 +1,12 @@
-package com.cuckesalad.jsonformatter.models;
+package in.theautomationstack.cucumberjsonformatter.models;
 
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 
-public class JvmHook {
+public class JvmTestStep {
 
-  private String type;
   private UUID id;
   private String codeLocation;
   private Date startTime;
@@ -15,19 +14,10 @@ public class JvmHook {
   private String keyword;
   private String name;
   private long line;
+  private final Set<JvmHook> beforeSteps = new LinkedHashSet<>();
+  private final Set<JvmHook> afterSteps = new LinkedHashSet<>();
   private Set<JvmAttachment> attachments = new LinkedHashSet<>();
-
-  public JvmHook(String type) {
-    this.type = type;
-  }
-
-  public String getType() {
-    return type;
-  }
-
-  public void setType(String type) {
-    this.type = type;
-  }
+  private JvmStatus status;
 
   public UUID getId() {
     return id;
@@ -61,6 +51,18 @@ public class JvmHook {
     this.endTime = endTime;
   }
 
+  public Set<JvmAttachment> getAttachments() {
+    return attachments;
+  }
+
+  public void setAttachments(Set<JvmAttachment> attachments) {
+    this.attachments = attachments;
+  }
+
+  public void setAttachment(JvmAttachment attachment) {
+    this.attachments.add(attachment);
+  }
+
   public String getKeyword() {
     return keyword;
   }
@@ -85,15 +87,27 @@ public class JvmHook {
     this.line = line;
   }
 
-  public Set<JvmAttachment> getAttachments() {
-    return attachments;
+  public Set<JvmHook> getBeforeSteps() {
+    return beforeSteps;
   }
 
-  public void setAttachments(Set<JvmAttachment> attachments) {
-    this.attachments = attachments;
+  public void setBeforeStep(JvmHook beforeStep) {
+    this.beforeSteps.add(beforeStep);
   }
 
-  public void setAttachment(JvmAttachment jvmAttachment) {
-    this.attachments.add(jvmAttachment);
+  public Set<JvmHook> getAfterSteps() {
+    return afterSteps;
+  }
+
+  public void setAfterStep(JvmHook afterStep) {
+    this.afterSteps.add(afterStep);
+  }
+
+  public JvmStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(JvmStatus status) {
+    this.status = status;
   }
 }

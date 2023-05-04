@@ -1,4 +1,4 @@
-package com.cuckesalad.jsonformatter.models;
+package in.theautomationstack.cucumberjsonformatter.models;
 
 import java.util.LinkedHashSet;
 import java.util.Optional;
@@ -33,6 +33,9 @@ public class JvmBackground {
   }
 
   public Optional<JvmTestStep> getTestStep(UUID id) {
+    if (id == null) {
+      return this.testSteps.stream().filter(testStep -> testStep.getId() == null).findFirst();
+    }
     return testSteps.stream().filter(testStep -> testStep.getId().equals(id)).findFirst();
   }
 
